@@ -7,14 +7,18 @@ import { useEffect, useRef, useState } from 'react';
 import { HiOutlinePhotograph } from 'react-icons/hi';
 import {app} from '../firebase';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
+import { addDoc, collection, getFirestore, serverTimestamp } from 'firebase/firestore';
 
 export default function Input() {
   const { data: session } = useSession();
   const [imageFileUrl, setImageFileUrl] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [imageFileUploading, setImageFileUploading] = useState(false);
+  const [text, setText] = useState('');
+  const [postLoading, setPostLoading] = useState(false);
  
   const imagePickRef = useRef(null);
+  const db = getFirestore(app);
   const addImageToPost = (e) => {
     const file = e.target.files[0];
     if(file){
@@ -56,6 +60,23 @@ export default function Input() {
   }
 );
 };
+
+  const handleSubmit = async () => {
+    setPostLoading(true);
+    const docRef = await addDoc(collection(db, 'posts'), {
+      uid: session.user.uid,
+      name: session.user.name,
+      username: session.user.username,
+      text,
+      profileImg: session.user.image,
+      timestamp: serverTimestamp(),
+      image: imageFileUrl,
+    });
+    setPostLoading(false);
+    setText('');
+    setImageFileUrl(null);
+    setSelectedFile(null);
+  };
   
   if (!session) return null;
   return (
@@ -70,11 +91,14 @@ export default function Input() {
           className='w-full border-none outline-none tracking-wide min-h-[50px] text-gray-700 '
           placeholder='Whats happening'
           rows='2'
+          value={text}
+          onChange={(e) => setText(e.target.value)}
         ></textarea>
         {
           selectedFile && (
-            <img src={imageFileUrl} alt='img' className='w-full max-h-[250px]
-            object-cover cursor-pointer' />
+            <img src={imageFileUrl} alt='img' className={`'w-full max-h-[250px]
+            object-cover cursor-pointer'
+          ${imageFileUploading ? 'animate-pulse' : ''}`} />
           )
         }
         <div className='flex items-center justify-between pt-2.5'>
@@ -83,8 +107,9 @@ export default function Input() {
           className='h-10 w-10 p-2 text-sky-500 hover:bg-sky-100 rounded-full cursor-pointer' />
           <input type="file" ref={imagePickRef} accept='image/*' onChange={addImageToPost} hidden/>
           <button
-            disabled
+            disabled={text.trim() === '' || postLoading || imageFileUploading}
             className='bg-blue-400 text-white px-4 py-1.5 rounded-full font-bold shadow-md hover:brightness-95 disabled:opacity-50'
+           onClick={handleSubmit}
           >
             Post
           </button>
